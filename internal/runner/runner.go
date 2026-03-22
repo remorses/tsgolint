@@ -318,7 +318,7 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		}
 		if underlineStart != underlineEnd {
 			w.WriteString(text[lineTextStart:underlineStart])
-			w.Write([]byte{0x1b, '[', '4', 'm', 0x1b, '[', '4', ':', '3', 'm', 0x1b, '[', '5', '8', ':', '5', ':', '1', '6', '0', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '1', '6', '0', 'm', 0x1b, '[', '2', '2', ';', '4', '9', 'm'})
+			w.Write([]byte{0x1b, '[', '4', 'm', 0x1b, '[', '4', ':', '3', 'm', 0x1b, '[', '5', '8', ':', '5', ':', '1', '9', '6', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '1', '9', '6', 'm', 0x1b, '[', '2', '2', ';', '4', '9', 'm'})
 			w.WriteString(text[underlineStart:underlineEnd])
 			w.Write([]byte{0x1b, '[', '0', 'm'})
 			w.WriteString(text[underlineEnd:lineTextEnd])
