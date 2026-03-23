@@ -5,6 +5,11 @@
 // --fix support: when enabled, diagnostics are collected per-file instead of
 // streamed. After linting completes, ApplyRuleFixes is called per file and
 // the fixed source is written back to disk. Only unfixed diagnostics are printed.
+//
+// --warn support: rules listed via --warn <name> are treated as warnings.
+// Warnings are displayed with a yellow header instead of the default bold style.
+// Only errors (non-warning diagnostics) cause exit code 1. Warnings alone
+// produce exit code 0 so they don't fail CI.
 package runner
 
 import (
@@ -47,6 +52,17 @@ type fileDiagnostics struct {
 
 const spaces = "                                                                                                    "
 
+// stringSlice implements flag.Value for repeatable string flags.
+// Usage: flagSet.Var(&warnRules, "warn", "treat rule as warning")
+// Allows: --warn rule-a --warn rule-b
+type stringSlice []string
+
+func (s *stringSlice) String() string { return strings.Join(*s, ",") }
+func (s *stringSlice) Set(v string) error {
+	*s = append(*s, v)
+	return nil
+}
+
 // Run executes the linter with the given rules and CLI args.
 // Returns the process exit code (0 = no errors, 1 = errors or failure).
 func Run(rules []rule.Rule, args []string) int {
@@ -59,6 +75,7 @@ func Run(rules []rule.Rule, args []string) int {
 		traceOut       string
 		cpuprofOut     string
 		singleThreaded bool
+		warnRules      stringSlice
 	)
 	flagSet.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flagSet.BoolVar(&listFiles, "list-files", false, "list matched files")
@@ -68,12 +85,19 @@ func Run(rules []rule.Rule, args []string) int {
 	flagSet.StringVar(&traceOut, "trace", "", "file to write trace to")
 	flagSet.StringVar(&cpuprofOut, "cpuprof", "", "file to write cpu profile to")
 	flagSet.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
+	flagSet.Var(&warnRules, "warn", "treat this rule as a warning (can be repeated)")
 	if err := flagSet.Parse(args); err != nil {
 		return 1
 	}
 	if help {
 		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --fix             Automatically fix violations\n    --list-files      List matched files\n    -h, --help        Show help\n")
 		return 0
+	}
+
+	// Build set of rule names that should be treated as warnings.
+	warningRulesSet := map[string]bool{}
+	for _, name := range warnRules {
+		warningRulesSet[name] = true
 	}
 
 	enableVirtualTerminalProcessing()
@@ -163,6 +187,7 @@ func Run(rules []rule.Rule, args []string) int {
 	var wg sync.WaitGroup
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
+	warningsCount := 0
 
 	// Per-file collector used only in --fix mode.
 	var (
@@ -193,12 +218,19 @@ func Run(rules []rule.Rule, args []string) int {
 		wg.Go(func() {
 			w := bufio.NewWriterSize(os.Stdout, 4096*100)
 			defer w.Flush()
+			totalCount := 0
 			for d := range diagnosticsChan {
-				errorsCount++
-				if errorsCount == 1 {
+				isWarning := warningRulesSet[d.RuleName]
+				if isWarning {
+					warningsCount++
+				} else {
+					errorsCount++
+				}
+				totalCount++
+				if totalCount == 1 {
 					w.WriteByte('\n')
 				}
-				printDiagnostic(d, w, comparePathOptions)
+				printDiagnostic(d, isWarning, w, comparePathOptions)
 				if w.Available() < 4096 {
 					w.Flush()
 				}
@@ -261,12 +293,17 @@ func Run(rules []rule.Rule, args []string) int {
 			}
 			// Print remaining unfixed diagnostics.
 			for _, d := range unapplied {
-				errorsCount++
+				isWarning := warningRulesSet[d.RuleName]
+				if isWarning {
+					warningsCount++
+				} else {
+					errorsCount++
+				}
 				if firstError {
 					w.WriteByte('\n')
 					firstError = false
 				}
-				printDiagnostic(d, w, comparePathOptions)
+				printDiagnostic(d, isWarning, w, comparePathOptions)
 				if w.Available() < 4096 {
 					w.Flush()
 				}
@@ -276,14 +313,6 @@ func Run(rules []rule.Rule, args []string) int {
 	}
 
 	// --- summary ---
-	errorsColor := "\x1b[1m"
-	if errorsCount == 0 {
-		errorsColor = "\x1b[1;32m"
-	}
-	errorsText := "errors"
-	if errorsCount == 1 {
-		errorsText = "error"
-	}
 	filesText := "files"
 	if len(files) == 1 {
 		filesText = "file"
@@ -296,28 +325,69 @@ func Run(rules []rule.Rule, args []string) int {
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
+
+	// Build the "Found X errors and Y warnings" summary part.
+	summaryParts := formatSummary(errorsCount, warningsCount)
+
+	lintStats := fmt.Sprintf(
+		" \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+		len(files), filesText, len(rules), rulesText,
+		time.Since(timeBefore).Round(time.Millisecond), threadsCount,
+	)
+
 	if fix && fixedFilesCount > 0 {
 		fixedFilesText := "files"
 		if fixedFilesCount == 1 {
 			fixedFilesText = "file"
 		}
 		fmt.Fprintf(os.Stdout,
-			"Fixed \x1b[1;32m%v\x1b[0m %v, %v%v\x1b[0m remaining %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
-			fixedFilesCount, fixedFilesText, errorsColor, errorsCount, errorsText,
-			len(files), filesText, len(rules), rulesText,
-			time.Since(timeBefore).Round(time.Millisecond), threadsCount,
+			"Fixed \x1b[1;32m%v\x1b[0m %v, %v remaining%v",
+			fixedFilesCount, fixedFilesText, summaryParts, lintStats,
 		)
 	} else {
-		fmt.Fprintf(os.Stdout,
-			"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
-			errorsColor, errorsCount, errorsText, len(files), filesText, len(rules), rulesText,
-			time.Since(timeBefore).Round(time.Millisecond), threadsCount,
-		)
+		fmt.Fprintf(os.Stdout, "Found %v%v", summaryParts, lintStats)
+	}
+
+	// Exit code 1 only when there are errors. Warnings alone don't fail CI.
+	if errorsCount > 0 {
+		return 1
 	}
 	return 0
 }
 
-func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
+// formatSummary builds a colored "X errors and Y warnings" string.
+// Only includes parts that are non-zero, e.g. "2 errors", "3 warnings",
+// or "2 errors and 3 warnings". When both are zero, returns green "0 errors".
+func formatSummary(errorsCount, warningsCount int) string {
+	var parts []string
+
+	if errorsCount > 0 {
+		errorsText := "errors"
+		if errorsCount == 1 {
+			errorsText = "error"
+		}
+		// Bold red for errors
+		parts = append(parts, fmt.Sprintf("\x1b[1;31m%v\x1b[0m %v", errorsCount, errorsText))
+	}
+
+	if warningsCount > 0 {
+		warningsText := "warnings"
+		if warningsCount == 1 {
+			warningsText = "warning"
+		}
+		// Bold yellow for warnings
+		parts = append(parts, fmt.Sprintf("\x1b[1;33m%v\x1b[0m %v", warningsCount, warningsText))
+	}
+
+	if len(parts) == 0 {
+		// All clean — green zero
+		return "\x1b[1;32m0\x1b[0m errors"
+	}
+
+	return strings.Join(parts, " and ")
+}
+
+func printDiagnostic(d rule.RuleDiagnostic, isWarning bool, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
@@ -334,7 +404,13 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		codeboxEndColumn = int(lineMap[codeboxEndLine+1]-lineMap[codeboxEndLine]) - 1
 	}
 	codeboxEnd := scanner.GetECMAPositionOfLineAndUTF16Character(d.SourceFile, codeboxEndLine, core.UTF16Offset(codeboxEndColumn))
-	w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '3', '7', 'm', ' '})
+	if isWarning {
+		// Yellow background, bold, white text for warnings
+		w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '3', 'm', ' '})
+	} else {
+		// Default: inverted bold white (existing style for errors)
+		w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '3', '7', 'm', ' '})
+	}
 	w.WriteString(d.RuleName)
 	w.WriteString(" \x1b[0m — ")
 	messageLineStart := 0
@@ -419,7 +495,13 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		}
 		if underlineStart != underlineEnd {
 			w.WriteString(text[lineTextStart:underlineStart])
-			w.Write([]byte{0x1b, '[', '4', 'm', 0x1b, '[', '4', ':', '3', 'm', 0x1b, '[', '5', '8', ':', '5', ':', '1', '9', '6', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '1', '9', '6', 'm', 0x1b, '[', '2', '2', ';', '4', '9', 'm'})
+			if isWarning {
+				// Yellow curly underline + yellow text for warnings (color 178 = dark yellow/gold)
+				w.Write([]byte{0x1b, '[', '4', 'm', 0x1b, '[', '4', ':', '3', 'm', 0x1b, '[', '5', '8', ':', '5', ':', '1', '7', '8', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '1', '7', '8', 'm', 0x1b, '[', '2', '2', ';', '4', '9', 'm'})
+			} else {
+				// Cyan/teal curly underline for errors (existing style, color 196)
+				w.Write([]byte{0x1b, '[', '4', 'm', 0x1b, '[', '4', ':', '3', 'm', 0x1b, '[', '5', '8', ':', '5', ':', '1', '9', '6', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '1', '9', '6', 'm', 0x1b, '[', '2', '2', ';', '4', '9', 'm'})
+			}
 			w.WriteString(text[underlineStart:underlineEnd])
 			w.Write([]byte{0x1b, '[', '0', 'm'})
 			w.WriteString(text[underlineEnd:lineTextEnd])
