@@ -90,7 +90,7 @@ func Run(rules []rule.Rule, args []string) int {
 		return 1
 	}
 	if help {
-		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --fix             Automatically fix violations\n    --list-files      List matched files\n    -h, --help        Show help\n")
+		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --fix             Automatically fix violations\n    --warn NAME       Treat rule as warning, not error (repeatable)\n    --list-files      List matched files\n    -h, --help        Show help\n")
 		return 0
 	}
 
