@@ -19,11 +19,16 @@ import (
 
 // snapshotDir is the directory where snapshot files are stored,
 // computed once relative to this source file.
+// When TSGOLINT_SNAPSHOT_CWD=true, snapshots are stored relative to
+// os.Getwd() instead (the test package directory), so external consumers
+// get snapshots next to their test files.
 var snapshotDir string
+var snapshotUseCwd bool
 
 func init() {
 	_, file, _, _ := runtime.Caller(0)
 	snapshotDir = filepath.Join(filepath.Dir(file), "__snapshots__")
+	snapshotUseCwd = os.Getenv("TSGOLINT_SNAPSHOT_CWD") == "true"
 }
 
 // snapshotter matches test output against stored snapshot files.
@@ -41,7 +46,13 @@ func newSnapshotter(filename string) *snapshotter {
 func (s *snapshotter) MatchSnapshot(t *testing.T, content string) {
 	t.Helper()
 
-	path := filepath.Join(snapshotDir, s.filename+".snap")
+	dir := snapshotDir
+	if snapshotUseCwd {
+		if wd, err := os.Getwd(); err == nil {
+			dir = filepath.Join(wd, "__snapshots__")
+		}
+	}
+	path := filepath.Join(dir, s.filename+".snap")
 	key := fmt.Sprintf("[%s - 1]", t.Name())
 	update := os.Getenv("UPDATE_SNAPS") == "true"
 
