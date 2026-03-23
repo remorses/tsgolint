@@ -10,6 +10,11 @@
 // Warnings are displayed with a yellow header instead of the default bold style.
 // Only errors (non-warning diagnostics) cause exit code 1. Warnings alone
 // produce exit code 0 so they don't fail CI.
+//
+// --warn-file support: when provided, warnings are only printed for files
+// in the given list (relative paths). Warnings for other files are silently
+// skipped. This keeps output focused on new/changed code in large codebases.
+// When no --warn-file flags are given, all warnings are printed.
 package runner
 
 import (
@@ -76,6 +81,7 @@ func Run(rules []rule.Rule, args []string) int {
 		cpuprofOut     string
 		singleThreaded bool
 		warnRules      stringSlice
+		warnFiles      stringSlice
 	)
 	flagSet.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flagSet.BoolVar(&listFiles, "list-files", false, "list matched files")
@@ -86,11 +92,12 @@ func Run(rules []rule.Rule, args []string) int {
 	flagSet.StringVar(&cpuprofOut, "cpuprof", "", "file to write cpu profile to")
 	flagSet.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
 	flagSet.Var(&warnRules, "warn", "treat this rule as a warning (can be repeated)")
+	flagSet.Var(&warnFiles, "warn-file", "only show warnings for this file (can be repeated)")
 	if err := flagSet.Parse(args); err != nil {
 		return 1
 	}
 	if help {
-		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --fix             Automatically fix violations\n    --warn NAME       Treat rule as warning, not error (repeatable)\n    --list-files      List matched files\n    -h, --help        Show help\n")
+		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --fix             Automatically fix violations\n    --warn NAME       Treat rule as warning, not error (repeatable)\n    --warn-file PATH  Only show warnings for this file (repeatable)\n    --list-files      List matched files\n    -h, --help        Show help\n")
 		return 0
 	}
 
@@ -98,6 +105,14 @@ func Run(rules []rule.Rule, args []string) int {
 	warningRulesSet := map[string]bool{}
 	for _, name := range warnRules {
 		warningRulesSet[name] = true
+	}
+
+	// Build set of file paths where warnings should be shown.
+	// When non-empty, warnings for files NOT in this set are silently skipped.
+	// Paths are stored with forward slashes to match tspath output.
+	warnFilesSet := map[string]bool{}
+	for _, f := range warnFiles {
+		warnFilesSet[filepath.ToSlash(f)] = true
 	}
 
 	enableVirtualTerminalProcessing()
@@ -221,6 +236,13 @@ func Run(rules []rule.Rule, args []string) int {
 			totalCount := 0
 			for d := range diagnosticsChan {
 				isWarning := warningRulesSet[d.RuleName]
+				// When --warn-file is set, skip warnings for files not in the list.
+				if isWarning && len(warnFilesSet) > 0 {
+					relPath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+					if !warnFilesSet[relPath] {
+						continue
+					}
+				}
 				if isWarning {
 					warningsCount++
 				} else {
@@ -294,6 +316,13 @@ func Run(rules []rule.Rule, args []string) int {
 			// Print remaining unfixed diagnostics.
 			for _, d := range unapplied {
 				isWarning := warningRulesSet[d.RuleName]
+				// When --warn-file is set, skip warnings for files not in the list.
+				if isWarning && len(warnFilesSet) > 0 {
+					relPath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+					if !warnFilesSet[relPath] {
+						continue
+					}
+				}
 				if isWarning {
 					warningsCount++
 				} else {
