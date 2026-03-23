@@ -223,7 +223,7 @@ func Run(rules []rule.Rule, args []string) int {
 		},
 		onDiagnostic,
 		func(d diagnostic.Internal) {},
-		linter.Fixes{Fix: true, FixSuggestions: true},
+		linter.Fixes{Fix: true, FixSuggestions: !fix},
 		linter.TypeErrors{ReportSyntactic: false, ReportSemantic: false},
 	)
 	if !fix {
@@ -238,6 +238,10 @@ func Run(rules []rule.Rule, args []string) int {
 	// --- apply fixes when --fix is set ---
 	fixedFilesCount := 0
 	if fix {
+		// Sort file names for deterministic output across runs (concurrent
+		// workers emit diagnostics in arbitrary order).
+		slices.Sort(fixFileOrder)
+
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		firstError := true
 		for _, fn := range fixFileOrder {
@@ -248,6 +252,9 @@ func Run(rules []rule.Rule, args []string) int {
 				osPath := filepath.FromSlash(fn)
 				if writeErr := os.WriteFile(osPath, []byte(fixedCode), 0o644); writeErr != nil {
 					fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fn, writeErr)
+					// Write failed — report all original diagnostics as remaining
+					// so the user doesn't get a false "clean" result.
+					unapplied = fd.diagnostics
 				} else {
 					fixedFilesCount++
 				}
