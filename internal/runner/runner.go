@@ -1,6 +1,10 @@
 // Package runner provides the standalone tsgolint linting entry point.
 // Accepts a slice of rules and CLI args, handles tsconfig resolution,
 // TypeScript program creation, parallel linting, and diagnostic output.
+//
+// --fix support: when enabled, diagnostics are collected per-file instead of
+// streamed. After linting completes, ApplyRuleFixes is called per file and
+// the fixed source is written back to disk. Only unfixed diagnostics are printed.
 package runner
 
 import (
@@ -9,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
@@ -33,6 +38,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
+// fileDiagnostics groups all diagnostics for a single source file so
+// ApplyRuleFixes can process them together when --fix is enabled.
+type fileDiagnostics struct {
+	sourceFile  *ast.SourceFile
+	diagnostics []rule.RuleDiagnostic
+}
+
 const spaces = "                                                                                                    "
 
 // Run executes the linter with the given rules and CLI args.
@@ -41,6 +53,7 @@ func Run(rules []rule.Rule, args []string) int {
 	flagSet := flag.NewFlagSet("lintcn", flag.ContinueOnError)
 	var (
 		help           bool
+		fix            bool
 		tsconfig       string
 		listFiles      bool
 		traceOut       string
@@ -49,6 +62,7 @@ func Run(rules []rule.Rule, args []string) int {
 	)
 	flagSet.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flagSet.BoolVar(&listFiles, "list-files", false, "list matched files")
+	flagSet.BoolVar(&fix, "fix", false, "automatically fix violations and write files back to disk")
 	flagSet.BoolVar(&help, "help", false, "show help")
 	flagSet.BoolVar(&help, "h", false, "show help")
 	flagSet.StringVar(&traceOut, "trace", "", "file to write trace to")
@@ -58,7 +72,7 @@ func Run(rules []rule.Rule, args []string) int {
 		return 1
 	}
 	if help {
-		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --list-files      List matched files\n    -h, --help        Show help\n")
+		fmt.Fprint(os.Stderr, " lintcn — type-aware TypeScript linter\n\nUsage:\n    lintcn [OPTIONS]\n\nOptions:\n    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.\n    --fix             Automatically fix violations\n    --list-files      List matched files\n    -h, --help        Show help\n")
 		return 0
 	}
 
@@ -143,23 +157,54 @@ func Run(rules []rule.Rule, args []string) int {
 		return len(b.Text()) - len(a.Text())
 	})
 
+	// --- diagnostic collection ---
+	// When --fix is set we collect diagnostics per-file so we can apply fixes
+	// after linting completes. Otherwise we stream-print as before.
 	var wg sync.WaitGroup
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
-	wg.Go(func() {
-		w := bufio.NewWriterSize(os.Stdout, 4096*100)
-		defer w.Flush()
-		for d := range diagnosticsChan {
-			errorsCount++
-			if errorsCount == 1 {
-				w.WriteByte('\n')
+
+	// Per-file collector used only in --fix mode.
+	var (
+		filesMu      sync.Mutex
+		filesFixMap  = map[string]*fileDiagnostics{}
+		fixFileOrder []string // preserves first-seen order for deterministic output
+	)
+
+	onDiagnostic := func(d rule.RuleDiagnostic) {
+		if fix {
+			filesMu.Lock()
+			fn := d.SourceFile.FileName()
+			fd, exists := filesFixMap[fn]
+			if !exists {
+				fd = &fileDiagnostics{sourceFile: d.SourceFile}
+				filesFixMap[fn] = fd
+				fixFileOrder = append(fixFileOrder, fn)
 			}
-			printDiagnostic(d, w, comparePathOptions)
-			if w.Available() < 4096 {
-				w.Flush()
-			}
+			fd.diagnostics = append(fd.diagnostics, d)
+			filesMu.Unlock()
+		} else {
+			diagnosticsChan <- d
 		}
-	})
+	}
+
+	// Stream-print goroutine (only used when --fix is NOT set).
+	if !fix {
+		wg.Go(func() {
+			w := bufio.NewWriterSize(os.Stdout, 4096*100)
+			defer w.Flush()
+			for d := range diagnosticsChan {
+				errorsCount++
+				if errorsCount == 1 {
+					w.WriteByte('\n')
+				}
+				printDiagnostic(d, w, comparePathOptions)
+				if w.Available() < 4096 {
+					w.Flush()
+				}
+			}
+		})
+	}
 
 	err = linter.RunLinterOnProgram(
 		utils.GetLogLevel(),
@@ -176,18 +221,54 @@ func Run(rules []rule.Rule, args []string) int {
 				}
 			})
 		},
-		func(d rule.RuleDiagnostic) { diagnosticsChan <- d },
+		onDiagnostic,
 		func(d diagnostic.Internal) {},
 		linter.Fixes{Fix: true, FixSuggestions: true},
 		linter.TypeErrors{ReportSyntactic: false, ReportSemantic: false},
 	)
-	close(diagnosticsChan)
+	if !fix {
+		close(diagnosticsChan)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error running linter: %v\n", err)
 		return 1
 	}
 	wg.Wait()
 
+	// --- apply fixes when --fix is set ---
+	fixedFilesCount := 0
+	if fix {
+		w := bufio.NewWriterSize(os.Stdout, 4096*100)
+		firstError := true
+		for _, fn := range fixFileOrder {
+			fd := filesFixMap[fn]
+			fixedCode, unapplied, wasFixed := linter.ApplyRuleFixes(fd.sourceFile.Text(), fd.diagnostics)
+			if wasFixed {
+				// tspath uses forward slashes; convert to OS path for writing.
+				osPath := filepath.FromSlash(fn)
+				if writeErr := os.WriteFile(osPath, []byte(fixedCode), 0o644); writeErr != nil {
+					fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fn, writeErr)
+				} else {
+					fixedFilesCount++
+				}
+			}
+			// Print remaining unfixed diagnostics.
+			for _, d := range unapplied {
+				errorsCount++
+				if firstError {
+					w.WriteByte('\n')
+					firstError = false
+				}
+				printDiagnostic(d, w, comparePathOptions)
+				if w.Available() < 4096 {
+					w.Flush()
+				}
+			}
+		}
+		w.Flush()
+	}
+
+	// --- summary ---
 	errorsColor := "\x1b[1m"
 	if errorsCount == 0 {
 		errorsColor = "\x1b[1;32m"
@@ -208,11 +289,24 @@ func Run(rules []rule.Rule, args []string) int {
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
-	fmt.Fprintf(os.Stdout,
-		"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
-		errorsColor, errorsCount, errorsText, len(files), filesText, len(rules), rulesText,
-		time.Since(timeBefore).Round(time.Millisecond), threadsCount,
-	)
+	if fix && fixedFilesCount > 0 {
+		fixedFilesText := "files"
+		if fixedFilesCount == 1 {
+			fixedFilesText = "file"
+		}
+		fmt.Fprintf(os.Stdout,
+			"Fixed \x1b[1;32m%v\x1b[0m %v, %v%v\x1b[0m remaining %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+			fixedFilesCount, fixedFilesText, errorsColor, errorsCount, errorsText,
+			len(files), filesText, len(rules), rulesText,
+			time.Since(timeBefore).Round(time.Millisecond), threadsCount,
+		)
+	} else {
+		fmt.Fprintf(os.Stdout,
+			"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+			errorsColor, errorsCount, errorsText, len(files), filesText, len(rules), rulesText,
+			time.Since(timeBefore).Round(time.Millisecond), threadsCount,
+		)
+	}
 	return 0
 }
 
