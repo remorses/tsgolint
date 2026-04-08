@@ -1000,6 +1000,14 @@ func TestPreferOptionalChainRule(t *testing.T) {
 
 			left !== shared.name && right.prop === shared.name;
 		`},
+		{
+			Code: `const a: string | null = '';
+const b: string = '';
+
+if (!a || b === a || b.indexOf('input, button, a')) {
+  console.log('Hello, World');
+}`,
+		},
 	}
 
 	invalidCases := []rule_tester.InvalidTestCase{
@@ -4190,6 +4198,19 @@ foo.bar?.() === undefined || foo.bar?.().baz;
 		Code: `request.payload === undefined || request.payload === null`,
 	}, rule_tester.ValidTestCase{
 		Code: `request.payload === null || request.payload === undefined`,
+	}, rule_tester.ValidTestCase{
+		Code: `
+        type ProjectID = { toString(): string };
+        type Intervention = { projectId: ProjectID | null };
+        declare const intervention: Intervention;
+        declare const previousIntervention: Intervention | null;
+
+        const isSameProjectAsPreviousIntervention = Boolean(
+          intervention.projectId &&
+            previousIntervention?.projectId?.toString() ===
+              intervention.projectId.toString(),
+        );
+      `,
 	})
 
 	// --- Spacing sanity checks ---

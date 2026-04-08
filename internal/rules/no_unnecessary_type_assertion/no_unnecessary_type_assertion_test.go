@@ -462,6 +462,73 @@ function unwrap<T>(input: number | string | Wrapper<T>): number {
 		{Code: `
 const value = ((<T>(input: T): T | undefined => input)(1)) as number;
 		`},
+		{
+			// https://github.com/oxc-project/oxc/issues/20656
+			Code: `
+interface Element {
+  tagName: string;
+}
+
+interface HTMLCanvasElement extends Element {
+  getContext(contextId: string): unknown;
+}
+
+interface HTMLElementTagNameMap {
+  canvas: HTMLCanvasElement;
+}
+
+declare const document: {
+  querySelector<K extends keyof HTMLElementTagNameMap>(selectors: K): HTMLElementTagNameMap[K] | null;
+  querySelector<E extends Element = Element>(selectors: string): E | null;
+};
+
+export const a = document.querySelector('.foo') as HTMLCanvasElement | null;
+		`},
+		{
+			Code: `
+interface Element { tagName: string; }
+
+interface HTMLCanvasElement extends Element { getContext(contextId: string): unknown; }
+
+interface Factory { new <E extends Element = Element>(): E | null; }
+
+declare const CanvasFactory: Factory;
+
+export const a = new CanvasFactory() as HTMLCanvasElement | null;
+		`},
+		{
+			Code: `
+interface Element { tagName: string; }
+
+interface HTMLCanvasElement extends Element { getContext(contextId: string): unknown; }
+
+declare const query: { <E extends Element = Element>(strings: TemplateStringsArray): E | null; };
+
+export const a = query` + "`" + `.foo` + "`" + ` as HTMLCanvasElement | null;
+		`},
+		{Code: `
+declare function load<T = unknown>(): Promise<T>;
+
+export async function main() {
+  const actual = (await load()) as Record<string, unknown>;
+  return { ...actual };
+}
+		`},
+		{Code: `
+declare function load<T = unknown>(): Promise<Promise<T>>;
+
+export async function main() {
+  const actual = (await await load()) as Record<string, unknown>;
+  return { ...actual };
+}
+		`},
+		{Code: `
+declare function load<T = unknown>(): Promise<T>;
+export async function main() {
+  const actual = <Record<string, unknown>>(await load());
+  return { ...actual };
+}
+		`},
 		{Code: `
 type NumberValueType = number | string;
 type NumberValuePairType = [NumberValueType, NumberValueType];

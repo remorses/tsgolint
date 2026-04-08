@@ -228,6 +228,18 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 			callee := ast.SkipParentheses(expression.AsCallExpression().Expression)
 			return ast.IsArrowFunction(callee) || ast.IsFunctionExpression(callee)
 		}
+		var isContextSensitiveCallLikeExpression func(expression *ast.Node) bool
+		isContextSensitiveCallLikeExpression = func(expression *ast.Node) bool {
+			if ast.IsCallExpression(expression) || ast.IsNewExpression(expression) || ast.IsTaggedTemplateExpression(expression) {
+				return true
+			}
+
+			if ast.IsAwaitExpression(expression) {
+				return isContextSensitiveCallLikeExpression(ast.SkipParentheses(expression.Expression()))
+			}
+
+			return false
+		}
 
 		getUncastType := func(node *ast.Node) *checker.Type {
 			expression := ast.SkipParentheses(node.Expression())
@@ -242,6 +254,15 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 				signatures := ctx.TypeChecker.GetCallSignatures(functionType)
 				if len(signatures) > 0 {
 					return ctx.TypeChecker.GetReturnTypeOfSignature(signatures[0])
+				}
+			}
+
+			// For call-like expressions, use the context-free expression type so
+			// contextual typing from the assertion itself doesn't leak into generic
+			// inference for the original expression.
+			if isContextSensitiveCallLikeExpression(expression) {
+				if t := checker.Checker_getContextFreeTypeOfExpression(ctx.TypeChecker, expression); t != nil {
+					return t
 				}
 			}
 

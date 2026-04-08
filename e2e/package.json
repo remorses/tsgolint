@@ -9,12 +9,7 @@
   "devDependencies": {
     "@types/node": "^24.3.1",
     "fast-glob": "^3.3.3",
-    "typescript": "^5.9.2",
-    "vitest": "^4.0.1"
-  },
-  "pnpm": {
-    "overrides": {
-      "vitest>vite": "8.0.1"
-    }
+    "typescript": "^6.0.0",
+    "vitest": "^4.1.1"
   }
 }
