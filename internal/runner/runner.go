@@ -434,6 +434,17 @@ func formatSummary(errorsCount, warningsCount int) string {
 	return strings.Join(parts, " and ")
 }
 
+func utf16LineLengthWithoutLineTerminator(text string, lineMap []core.TextPos, line int) core.UTF16Offset {
+	lineStart := int(lineMap[line])
+	lineEnd := len(text)
+	if line+1 < len(lineMap) {
+		lineEnd = int(lineMap[line+1])
+	}
+	lineText := strings.TrimSuffix(text[lineStart:lineEnd], "\n")
+	lineText = strings.TrimSuffix(lineText, "\r")
+	return core.UTF16Len(lineText)
+}
+
 func printDiagnostic(d rule.RuleDiagnostic, isWarning bool, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
@@ -444,13 +455,8 @@ func printDiagnostic(d rule.RuleDiagnostic, isWarning bool, w *bufio.Writer, com
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndline+1, len(lineMap)-1)
 	codeboxStart := scanner.GetECMAPositionOfLineAndUTF16Character(d.SourceFile, codeboxStartLine, 0)
-	var codeboxEndColumn int
-	if codeboxEndLine == len(lineMap)-1 {
-		codeboxEndColumn = len(text) - int(lineMap[len(lineMap)-1])
-	} else {
-		codeboxEndColumn = int(lineMap[codeboxEndLine+1]-lineMap[codeboxEndLine]) - 1
-	}
-	codeboxEnd := scanner.GetECMAPositionOfLineAndUTF16Character(d.SourceFile, codeboxEndLine, core.UTF16Offset(codeboxEndColumn))
+	codeboxEndColumn := utf16LineLengthWithoutLineTerminator(text, lineMap, codeboxEndLine)
+	codeboxEnd := scanner.GetECMAPositionOfLineAndUTF16Character(d.SourceFile, codeboxEndLine, codeboxEndColumn)
 	if isWarning {
 		// Yellow background, bold, white text for warnings
 		w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '3', 'm', ' '})
