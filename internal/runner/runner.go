@@ -457,13 +457,16 @@ func printDiagnostic(d rule.RuleDiagnostic, isWarning bool, w *bufio.Writer, com
 	codeboxStart := scanner.GetECMAPositionOfLineAndUTF16Character(d.SourceFile, codeboxStartLine, 0)
 	codeboxEndColumn := utf16LineLengthWithoutLineTerminator(text, lineMap, codeboxEndLine)
 	codeboxEnd := scanner.GetECMAPositionOfLineAndUTF16Character(d.SourceFile, codeboxEndLine, codeboxEndColumn)
+	severityPrefix := "error "
 	if isWarning {
+		severityPrefix = "warning "
 		// Yellow background, bold, white text for warnings
 		w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '3', 'm', ' '})
 	} else {
 		// Default: inverted bold white (existing style for errors)
 		w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '3', '7', 'm', ' '})
 	}
+	w.WriteString(severityPrefix)
 	w.WriteString(d.RuleName)
 	w.WriteString(" \x1b[0m — ")
 	messageLineStart := 0
@@ -472,7 +475,7 @@ func printDiagnostic(d rule.RuleDiagnostic, isWarning bool, w *bufio.Writer, com
 			w.WriteString(d.Message.Description[messageLineStart : i+1])
 			messageLineStart = i + 1
 			w.WriteString("    \x1b[2m│\x1b[0m")
-			w.WriteString(spaces[:len(d.RuleName)+1])
+			w.WriteString(spaces[:len(severityPrefix)+len(d.RuleName)+1])
 		}
 	}
 	if messageLineStart <= len(d.Message.Description) {
