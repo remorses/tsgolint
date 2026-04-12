@@ -136,10 +136,14 @@ func Checker_getContextualType(recv *checker.Checker, node *ast.Node, contextFla
 func Checker_getContextualTypeForArgumentAtIndex(recv *checker.Checker, callTarget *ast.Node, argIndex int) *checker.Type
 //go:linkname Checker_getAwaitedType github.com/microsoft/typescript-go/internal/checker.(*Checker).getAwaitedType
 func Checker_getAwaitedType(recv *checker.Checker, t *checker.Type) *checker.Type
+//go:linkname Checker_GetAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
+func Checker_GetAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 //go:linkname Checker_getAccessedPropertyName github.com/microsoft/typescript-go/internal/checker.(*Checker).getAccessedPropertyName
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/typescript-go/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
+//go:linkname Checker_TypeToTypeNode github.com/microsoft/typescript-go/internal/checker.(*Checker).TypeToTypeNode
+func Checker_TypeToTypeNode(recv *checker.Checker, t *checker.Type, enclosingDeclaration *ast.Node, flags nodebuilder.Flags, idToSymbol map[*ast.IdentifierNode]*ast.Symbol) *ast.TypeNode
 //go:linkname Checker_isTypeIdenticalTo github.com/microsoft/typescript-go/internal/checker.(*Checker).isTypeIdenticalTo
 func Checker_isTypeIdenticalTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_isTypeAssignableTo github.com/microsoft/typescript-go/internal/checker.(*Checker).isTypeAssignableTo
@@ -148,6 +152,14 @@ func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, tar
 func Checker_getTypePredicateOfSignature(recv *checker.Checker, sig *checker.Signature) *checker.TypePredicate
 //go:linkname Checker_GetShorthandAssignmentValueSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetShorthandAssignmentValueSymbol
 func Checker_GetShorthandAssignmentValueSymbol(recv *checker.Checker, location *ast.Node) *ast.Symbol
+//go:linkname Checker_IsTypeSymbolAccessible github.com/microsoft/typescript-go/internal/checker.(*Checker).IsTypeSymbolAccessible
+func Checker_IsTypeSymbolAccessible(recv *checker.Checker, typeSymbol *ast.Symbol, enclosingDeclaration *ast.Node) bool
+//go:linkname Checker_IsValueSymbolAccessible github.com/microsoft/typescript-go/internal/checker.(*Checker).IsValueSymbolAccessible
+func Checker_IsValueSymbolAccessible(recv *checker.Checker, symbol *ast.Symbol, enclosingDeclaration *ast.Node) bool
+//go:linkname Checker_IsSymbolAccessibleByFlags github.com/microsoft/typescript-go/internal/checker.(*Checker).IsSymbolAccessibleByFlags
+func Checker_IsSymbolAccessibleByFlags(recv *checker.Checker, symbol *ast.Symbol, enclosingDeclaration *ast.Node, flags ast.SymbolFlags) bool
+//go:linkname Checker_IsSymbolAccessible github.com/microsoft/typescript-go/internal/checker.(*Checker).IsSymbolAccessible
+func Checker_IsSymbolAccessible(recv *checker.Checker, symbol *ast.Symbol, enclosingDeclaration *ast.Node, meaning ast.SymbolFlags, shouldComputeAliasesToMakeVisible bool) printer.SymbolAccessibilityResult
 type extra_Checker struct {
   id uint32
   program checker.Program
