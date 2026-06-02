@@ -1008,6 +1008,14 @@ if (!a || b === a || b.indexOf('input, button, a')) {
   console.log('Hello, World');
 }`,
 		},
+		{Code: `
+			function test() {
+				let x: undefined | { a: string }, y: undefined | { a: string }
+				if (x && y && x.a === y.a) {
+					console.log("x and y are equal")
+				}
+			}
+		`},
 	}
 
 	invalidCases := []rule_tester.InvalidTestCase{
@@ -4240,6 +4248,27 @@ declare const text: string | undefined;
 !pattern || (text?.match(pattern));
 `},
 		Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferOptionalChain"}},
+	})
+
+	invalidCases = append(invalidCases, rule_tester.InvalidTestCase{
+		Code: `
+declare const item: { value: string | null } | undefined;
+item === undefined || item.value === null;
+`,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{
+				MessageId: "preferOptionalChain",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{
+						MessageId: "optionalChainSuggest",
+						Output: `
+declare const item: { value: string | null } | undefined;
+item?.value === null;
+`,
+					},
+				},
+			},
+		},
 	})
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferOptionalChainRule, validCases, invalidCases)

@@ -1,4 +1,4 @@
-From 3582c2868855f13b27ab1727f21da776462b10ff Mon Sep 17 00:00:00 2001
+From 6b668b9b04f4f7e9cb69dd7faa9046e1f1c575f3 Mon Sep 17 00:00:00 2001
 From: Cameron Clark <cameron.clark@hey.com>
 Date: Fri, 13 Feb 2026 18:37:25 +0000
 Subject: [PATCH 4/5] fix(collections): avoid internal json import in

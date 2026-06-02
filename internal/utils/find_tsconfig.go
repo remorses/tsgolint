@@ -26,6 +26,7 @@ func NewTsConfigResolver(fs vfs.FS, currentDirectory string) *TsConfigResolver {
 		fs:               fs,
 		currentDirectory: currentDirectory,
 		configFileRegistryBuilder: project.NewConfigFileRegistryBuilder(
+			false,
 			project.TsGoLintNewSnapshotFSBuilder(fs, currentDirectory), &project.ConfigFileRegistry{}, project.NewExtendedConfigCache(), 0, &project.SessionOptions{
 				CurrentDirectory: currentDirectory,
 			}, "", nil),
@@ -181,7 +182,7 @@ func (r *TsConfigResolver) findConfigWithReferences(
 		}
 	}
 
-	if ancestorConfigName := r.configFileRegistryBuilder.GetAncestorConfigFileName(fileName, path, configFileName, nil); ancestorConfigName != "" {
+	if ancestorConfigName := r.getAncestorConfigFileName(fileName, path, configFileName); ancestorConfigName != "" {
 		return r.findConfigWithReferences(
 			fileName,
 			path,
@@ -195,6 +196,16 @@ func (r *TsConfigResolver) findConfigWithReferences(
 	}
 
 	return configSearchResult{configFileName: ""}
+}
+
+func (r *TsConfigResolver) getAncestorConfigFileName(fileName string, path tspath.Path, nearestConfigFileName string) string {
+	ancestorConfigName := r.configFileRegistryBuilder.GetAncestorConfigFileName(fileName, path, nearestConfigFileName, nil)
+	if ancestorConfigName != "" {
+		return ancestorConfigName
+	}
+	// Intentionally pass the nearest tsconfig path so the ancestor search
+	// resumes from that config's parent directory rather than from the source file.
+	return r.configFileRegistryBuilder.ComputeConfigFileName(nearestConfigFileName, true, nil)
 }
 
 type ResolutionResult struct {

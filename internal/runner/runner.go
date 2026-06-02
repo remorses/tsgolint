@@ -164,13 +164,20 @@ func Run(rules []rule.Rule, args []string) int {
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 
-	program, _, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host, false)
+	program, internalDiagnostics, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host, false)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+		fmt.Fprintf(os.Stderr, "error creating TS program: %v\n", err)
+		return 1
+	}
+	if len(internalDiagnostics) > 0 {
+		fmt.Fprintf(os.Stderr, "error creating TS program: %d diagnostic(s)\n", len(internalDiagnostics))
+		for _, d := range internalDiagnostics {
+			diagnostic.WriteInternal(os.Stderr, d)
+		}
 		return 1
 	}
 	if program == nil {
-		fmt.Fprintf(os.Stderr, "error creating TS program")
+		fmt.Fprintf(os.Stderr, "error creating TS program\n")
 		return 1
 	}
 
@@ -272,12 +279,12 @@ func Run(rules []rule.Rule, args []string) int {
 		})
 	}
 
-	err = linter.RunLinterOnProgram(
-		utils.GetLogLevel(),
-		program,
-		files,
-		runtime.GOMAXPROCS(0),
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	err = linter.RunLinterOnProgram(linter.RunLinterOnProgramOptions{
+		LogLevel: utils.GetLogLevel(),
+		Program:  program,
+		Files:    files,
+		Workers:  runtime.GOMAXPROCS(0),
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
 					Name: r.Name,
@@ -287,11 +294,11 @@ func Run(rules []rule.Rule, args []string) int {
 				}
 			})
 		},
-		onDiagnostic,
-		func(d diagnostic.Internal) {},
-		linter.Fixes{Fix: true, FixSuggestions: !fix},
-		linter.TypeErrors{ReportSyntactic: false, ReportSemantic: false},
-	)
+		OnDiagnostic:         onDiagnostic,
+		OnInternalDiagnostic: func(d diagnostic.Internal) {},
+		Fixes:                linter.Fixes{Fix: true, FixSuggestions: !fix},
+		TypeErrors:           linter.TypeErrors{ReportSyntactic: false, ReportSemantic: false},
+	})
 	if !fix {
 		close(diagnosticsChan)
 	}

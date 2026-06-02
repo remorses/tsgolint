@@ -16,6 +16,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/microsoft/typescript-go/shim/core"
+
 	"github.com/typescript-eslint/tsgolint/internal/diagnostic"
 	"github.com/typescript-eslint/tsgolint/internal/linter"
 	"github.com/typescript-eslint/tsgolint/internal/rule"
@@ -83,7 +85,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -343,12 +344,12 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 
 		if diagnosticHighlightActive {
 			underlineEnd = lineTextEnd
-		} else if int(lineMap[line]) <= diagnosticStart && (line == len(lineMap) || diagnosticStart < int(lineMap[line+1])) {
+		} else if int(lineMap[line]) <= diagnosticStart && (line == len(lineMap)-1 || diagnosticStart < int(lineMap[line+1])) {
 			underlineStart = min(max(lineTextStart, diagnosticStart), lineTextEnd)
 			underlineEnd = lineTextEnd
 			diagnosticHighlightActive = true
 		}
-		if int(lineMap[line]) <= diagnosticEnd && (line == len(lineMap) || diagnosticEnd < int(lineMap[line+1])) {
+		if int(lineMap[line]) <= diagnosticEnd && (line == len(lineMap)-1 || diagnosticEnd < int(lineMap[line+1])) {
 			underlineEnd = min(max(underlineStart, diagnosticEnd), lineTextEnd)
 			diagnosticHighlightActive = false
 		}
@@ -374,7 +375,9 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	w.WriteString("  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 }
 
-const usage = `✨ tsgolint - speedy TypeScript linter
+const unsupportedCliWarning = "Warning: the `tsgolint` CLI entrypoint is unsupported!\nUse Oxlint type-aware linting instead: https://oxc.rs/docs/guide/usage/linter/type-aware\n\n"
+
+const usage = unsupportedCliWarning + `✨ tsgolint - speedy TypeScript linter
 
 Usage:
     tsgolint [OPTIONS]
@@ -382,8 +385,61 @@ Usage:
 Options:
     --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
 		--list-files      List matched files
+    --debug OPTIONS   Enable debug output options. Possible values: timings.
     -h, --help        Show help
 `
+
+func parseDebugTimings(options string) (bool, error) {
+	if options == "" {
+		return false, nil
+	}
+
+	timings := false
+	for _, option := range strings.Split(options, ",") {
+		if option == "" {
+			continue
+		}
+		switch option {
+		case "timings":
+			timings = true
+		default:
+			return false, fmt.Errorf("unknown debug option %q", option)
+		}
+	}
+
+	return timings, nil
+}
+
+func formatRuleTimingTable(records []linter.RuleTimingRecord) string {
+	if len(records) == 0 {
+		return ""
+	}
+
+	ruleWidth := len("Rule")
+	callsWidth := len("Calls")
+	var total time.Duration
+	for _, record := range records {
+		ruleWidth = max(ruleWidth, len(record.RuleName))
+		callsWidth = max(callsWidth, len(strconv.FormatUint(record.Calls, 10)))
+		total += record.Duration
+	}
+
+	var output strings.Builder
+	fmt.Fprintf(&output, "\nRule timings:\n")
+	fmt.Fprintf(&output, "%-*s  %10s  %8s  %*s\n", ruleWidth, "Rule", "Time (ms)", "Relative", callsWidth, "Calls")
+	fmt.Fprintf(&output, "%-*s  %-10s  %-8s  %-*s\n", ruleWidth, strings.Repeat("-", ruleWidth), strings.Repeat("-", 10), strings.Repeat("-", 8), callsWidth, strings.Repeat("-", callsWidth))
+
+	for _, record := range records {
+		millis := float64(record.Duration) / float64(time.Millisecond)
+		relative := 0.0
+		if total > 0 {
+			relative = float64(record.Duration) / float64(total) * 100
+		}
+		fmt.Fprintf(&output, "%-*s  %10.3f  %7.1f%%  %*d\n", ruleWidth, record.RuleName, millis, relative, callsWidth, record.Calls)
+	}
+
+	return output.String()
+}
 
 func runMain() int {
 	if len(os.Args) > 1 && os.Args[1] == "headless" {
@@ -396,6 +452,7 @@ func runMain() int {
 		help      bool
 		tsconfig  string
 		listFiles bool
+		debug     string
 
 		traceOut       string
 		cpuprofOut     string
@@ -404,6 +461,7 @@ func runMain() int {
 
 	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
+	flag.StringVar(&debug, "debug", "", "enable debug output options")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 
@@ -417,6 +475,14 @@ func runMain() int {
 		flag.Usage()
 		return 0
 	}
+
+	debugTimings, err := parseDebugTimings(debug)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing debug options: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(os.Stderr, unsupportedCliWarning)
 
 	enableVirtualTerminalProcessing()
 	timeBefore := time.Now()
@@ -467,14 +533,21 @@ func runMain() int {
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 
-	program, _, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host, false)
+	program, internalDiagnostics, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host, false)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+		fmt.Fprintf(os.Stderr, "error creating TS program: %v\n", err)
+		return 1
+	}
+	if len(internalDiagnostics) > 0 {
+		fmt.Fprintf(os.Stderr, "error creating TS program: %d diagnostic(s)\n", len(internalDiagnostics))
+		for _, d := range internalDiagnostics {
+			diagnostic.WriteInternal(os.Stderr, d)
+		}
 		return 1
 	}
 
 	if program == nil {
-		fmt.Fprintf(os.Stderr, "error creating TS program")
+		fmt.Fprintf(os.Stderr, "error creating TS program\n")
 		return 1
 	}
 
@@ -522,12 +595,16 @@ func runMain() int {
 		}
 	})
 
-	err = linter.RunLinterOnProgram(
-		utils.GetLogLevel(),
-		program,
-		files,
-		runtime.GOMAXPROCS(0),
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	var timingStore *linter.RuleTimingStore
+	if debugTimings {
+		timingStore = linter.NewRuleTimingStore()
+	}
+	err = linter.RunLinterOnProgram(linter.RunLinterOnProgramOptions{
+		LogLevel: utils.GetLogLevel(),
+		Program:  program,
+		Files:    files,
+		Workers:  runtime.GOMAXPROCS(0),
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(allRules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
 					Name: r.Name,
@@ -537,21 +614,18 @@ func runMain() int {
 				}
 			})
 		},
-		func(d rule.RuleDiagnostic) {
-			diagnosticsChan <- d
-		},
-		func(d diagnostic.Internal) {
-			// Internal diagnostics are not used in this mode
-		},
-		linter.Fixes{
+		OnDiagnostic:         func(d rule.RuleDiagnostic) { diagnosticsChan <- d },
+		OnInternalDiagnostic: func(d diagnostic.Internal) {},
+		Fixes: linter.Fixes{
 			Fix:            true,
 			FixSuggestions: true,
 		},
-		linter.TypeErrors{
+		TypeErrors: linter.TypeErrors{
 			ReportSyntactic: false,
 			ReportSemantic:  false,
 		},
-	)
+		TimingStore: timingStore,
+	})
 
 	close(diagnosticsChan)
 	if err != nil {
@@ -594,6 +668,9 @@ func runMain() int {
 		time.Since(timeBefore).Round(time.Millisecond),
 		threadsCount,
 	)
+	if timingStore != nil {
+		os.Stdout.WriteString(formatRuleTimingTable(timingStore.Collect()))
+	}
 
 	return 0
 }

@@ -53,13 +53,6 @@ func buildComparisonDiagnostic(
 	}
 }
 
-// func buildReplaceValueWithEnumMessage() rule.RuleMessage {
-// return rule.RuleMessage{
-// Id:          "replaceValueWithEnum",
-// Description: "Replace with an enum value comparison.",
-// }
-// }
-
 /**
  * @returns What type a type's enum value is (number or string), if either.
  */
@@ -73,22 +66,20 @@ func getEnumValueType(t *checker.Type) checker.TypeFlags {
 	return checker.TypeFlagsNone
 }
 
+func typeIsPrimitiveLike(t *checker.Type, flags checker.TypeFlags) bool {
+	return utils.Every(utils.UnionTypeParts(t), func(unionPart *checker.Type) bool {
+		return utils.Some(utils.IntersectionTypeParts(unionPart), func(intersectionPart *checker.Type) bool {
+			return utils.IsTypeFlagSet(intersectionPart, flags)
+		})
+	})
+}
+
 /**
  * @returns Whether the right type is an unsafe comparison against any left type.
  */
 func typeViolates(leftTypeParts []*checker.Type, rightType *checker.Type) bool {
-	rightNumberLike, rightStringLike := false, false
-	for _, typePart := range utils.IntersectionTypeParts(rightType) {
-		if utils.IsTypeFlagSet(typePart, checker.TypeFlagsNumberLike) {
-			rightNumberLike = true
-		}
-		if utils.IsTypeFlagSet(typePart, checker.TypeFlagsStringLike) {
-			rightStringLike = true
-		}
-		if rightNumberLike && rightStringLike {
-			break
-		}
-	}
+	rightNumberLike := typeIsPrimitiveLike(rightType, checker.TypeFlagsNumber|checker.TypeFlagsNumberLike)
+	rightStringLike := typeIsPrimitiveLike(rightType, checker.TypeFlagsString|checker.TypeFlagsStringLike)
 	if !rightNumberLike && !rightStringLike {
 		return false
 	}
@@ -170,7 +161,7 @@ var NoUnsafeEnumComparisonRule = rule.Rule{
 				rightType := ctx.TypeChecker.GetTypeAtLocation(expr.Right)
 
 				if isMismatchedComparison(leftType, rightType) {
-					ctx.ReportDiagnostic(buildComparisonDiagnostic(
+					diagnostic := buildComparisonDiagnostic(
 						ctx.SourceFile,
 						ctx.TypeChecker,
 						node,
@@ -181,7 +172,11 @@ var NoUnsafeEnumComparisonRule = rule.Rule{
 						"Right operand",
 						expr.Right,
 						rightType,
-					))
+					)
+
+					ctx.ReportDiagnosticWithSuggestions(diagnostic, func() []rule.RuleSuggestion {
+						return enumComparisonSuggestions(ctx.SourceFile, ctx.TypeChecker, node, expr, leftType, rightType)
+					})
 				}
 			},
 

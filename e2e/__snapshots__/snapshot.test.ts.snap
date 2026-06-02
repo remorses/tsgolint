@@ -1,9 +1,23 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`TSGoLint E2E Snapshot Tests > should attach the tsconfig path to tsconfig-error diagnostics without a TypeScript diagnostic file (oxc-project/oxc#2200) 1`] = `
+[
+  {
+    "file_path": "fixtures/issue-oxc-2200/tsconfig.json",
+    "kind": 1,
+    "message": {
+      "description": "Invalid tsconfig",
+      "help": "Cannot find type definition file for 'tsgolint-missing-type-package'.",
+      "id": "tsconfig-error",
+    },
+  },
+]
+`;
+
 exports[`TSGoLint E2E Snapshot Tests > should correctly evaluate project references 1`] = `
 [
   {
-    "file_path": "",
+    "file_path": "fixtures/project-references/img/typescript/tsconfig.app.json",
     "kind": 1,
     "message": {
       "description": "Invalid tsconfig",
@@ -293,12 +307,21 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
   {
     "file_path": "fixtures/basic/rules/no-array-delete/index.ts",
     "kind": 0,
+    "labeled_ranges": [
+      {
+        "label": "This expression evaluates to an array.",
+        "range": {
+          "end": 95,
+          "pos": 92,
+        },
+      },
+    ],
     "message": {
       "description": "Using the \`delete\` operator with an array expression is unsafe.",
       "id": "noArrayDelete",
     },
     "range": {
-      "end": 98,
+      "end": 91,
       "pos": 85,
     },
     "rule": "no-array-delete",
@@ -545,6 +568,15 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       },
     ],
     "kind": 0,
+    "labeled_ranges": [
+      {
+        "label": "Type ''A'' is first declared here.",
+        "range": {
+          "end": 84,
+          "pos": 81,
+        },
+      },
+    ],
     "message": {
       "description": "Union type constituent is duplicated with  'A'.",
       "id": "duplicate",
@@ -574,6 +606,15 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       },
     ],
     "kind": 0,
+    "labeled_ranges": [
+      {
+        "label": "Type ''foo'' is first declared here.",
+        "range": {
+          "end": 195,
+          "pos": 190,
+        },
+      },
+    ],
     "message": {
       "description": "Union type constituent is duplicated with  'foo'.",
       "id": "duplicate",
@@ -885,10 +926,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 132,
+      "end": 108,
       "pos": 79,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 85,
+              "pos": 79,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/no-floating-promises/index.ts",
@@ -898,10 +956,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 270,
-      "pos": 252,
+      "end": 264,
+      "pos": 261,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 258,
+              "pos": 252,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/no-floating-promises/void.ts",
@@ -911,10 +986,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 53,
+      "end": 29,
       "pos": 0,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 6,
+              "pos": 0,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/no-for-in-array/index.ts",
@@ -1331,6 +1423,29 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
   },
   {
     "file_path": "fixtures/basic/rules/no-unnecessary-template-expression/index.ts",
+    "fixes": [
+      {
+        "range": {
+          "end": 204,
+          "pos": 202,
+        },
+        "text": "",
+      },
+      {
+        "range": {
+          "end": 212,
+          "pos": 211,
+        },
+        "text": "",
+      },
+      {
+        "range": {
+          "end": 211,
+          "pos": 204,
+        },
+        "text": "Hello",
+      },
+    ],
     "kind": 0,
     "message": {
       "description": "Template literal expression is unnecessary and can be simplified.",
@@ -1344,6 +1459,29 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
   },
   {
     "file_path": "fixtures/basic/rules/no-unnecessary-template-expression/index.ts",
+    "fixes": [
+      {
+        "range": {
+          "end": 215,
+          "pos": 213,
+        },
+        "text": "",
+      },
+      {
+        "range": {
+          "end": 223,
+          "pos": 222,
+        },
+        "text": "",
+      },
+      {
+        "range": {
+          "end": 222,
+          "pos": 215,
+        },
+        "text": "world",
+      },
+    ],
     "kind": 0,
     "message": {
       "description": "Template literal expression is unnecessary and can be simplified.",
@@ -1368,30 +1506,8 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
     ],
     "kind": 0,
     "message": {
-      "description": "This value can be trivially inferred for this type parameter, so it can be omitted.",
-      "id": "canBeInferred",
-    },
-    "range": {
-      "end": 213,
-      "pos": 207,
-    },
-    "rule": "no-unnecessary-type-arguments",
-  },
-  {
-    "file_path": "fixtures/basic/rules/no-unnecessary-type-arguments/index.ts",
-    "fixes": [
-      {
-        "range": {
-          "end": 214,
-          "pos": 206,
-        },
-        "text": "",
-      },
-    ],
-    "kind": 0,
-    "message": {
       "description": "This is the default value for this type parameter, so it can be omitted.",
-      "id": "isDefaultParameterValue",
+      "id": "unnecessaryTypeParameter",
     },
     "range": {
       "end": 213,
@@ -2416,15 +2532,6 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
   },
   {
     "file_path": "fixtures/basic/rules/no-useless-default-assignment/index.ts",
-    "fixes": [
-      {
-        "range": {
-          "end": 21,
-          "pos": 16,
-        },
-        "text": "",
-      },
-    ],
     "kind": 0,
     "labeled_ranges": [
       {
@@ -2452,6 +2559,23 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "pos": 19,
     },
     "rule": "no-useless-default-assignment",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 21,
+              "pos": 16,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove the default assignment.",
+          "id": "removeDefaultAssignment",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/non-nullable-type-assertion-style/index.ts",
@@ -2481,22 +2605,6 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
   },
   {
     "file_path": "fixtures/basic/rules/non-nullable-type-assertion-style/index.ts",
-    "fixes": [
-      {
-        "range": {
-          "end": 201,
-          "pos": 191,
-        },
-        "text": "",
-      },
-      {
-        "range": {
-          "end": 191,
-          "pos": 191,
-        },
-        "text": "!",
-      },
-    ],
     "kind": 0,
     "message": {
       "description": "Use a ! assertion to more succinctly remove null and undefined from the type.",
@@ -2507,25 +2615,33 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "pos": 186,
     },
     "rule": "non-nullable-type-assertion-style",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 201,
+              "pos": 191,
+            },
+            "text": "",
+          },
+          {
+            "range": {
+              "end": 191,
+              "pos": 191,
+            },
+            "text": "!",
+          },
+        ],
+        "message": {
+          "description": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+          "id": "preferNonNullAssertion",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/non-nullable-type-assertion-style/index.ts",
-    "fixes": [
-      {
-        "range": {
-          "end": 276,
-          "pos": 266,
-        },
-        "text": "",
-      },
-      {
-        "range": {
-          "end": 266,
-          "pos": 266,
-        },
-        "text": "!",
-      },
-    ],
     "kind": 0,
     "message": {
       "description": "Use a ! assertion to more succinctly remove null and undefined from the type.",
@@ -2536,6 +2652,30 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "pos": 261,
     },
     "rule": "non-nullable-type-assertion-style",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 276,
+              "pos": 266,
+            },
+            "text": "",
+          },
+          {
+            "range": {
+              "end": 266,
+              "pos": 266,
+            },
+            "text": "!",
+          },
+        ],
+        "message": {
+          "description": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+          "id": "preferNonNullAssertion",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/only-throw-error/index.ts",
@@ -3354,10 +3494,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 285,
-      "pos": 205,
+      "end": 216,
+      "pos": 213,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 211,
+              "pos": 205,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/rules/restrict-plus-operands/index.ts",
@@ -4035,10 +4192,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 132,
+      "end": 108,
       "pos": 79,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 85,
+              "pos": 79,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/a.ts",
@@ -4048,10 +4222,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 270,
-      "pos": 252,
+      "end": 264,
+      "pos": 261,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 258,
+              "pos": 252,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/b.mts",
@@ -4315,10 +4506,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 132,
+      "end": 108,
       "pos": 79,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 85,
+              "pos": 79,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/b.mts",
@@ -4328,10 +4536,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 270,
-      "pos": 252,
+      "end": 264,
+      "pos": 261,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 258,
+              "pos": 252,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/c.cts",
@@ -4595,10 +4820,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 132,
+      "end": 108,
       "pos": 79,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 85,
+              "pos": 79,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/c.cts",
@@ -4608,10 +4850,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 270,
-      "pos": 252,
+      "end": 264,
+      "pos": 261,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 258,
+              "pos": 252,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/d.tsx",
@@ -4875,10 +5134,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 132,
+      "end": 108,
       "pos": 79,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 85,
+              "pos": 79,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
   {
     "file_path": "fixtures/basic/src/d.tsx",
@@ -4888,10 +5164,27 @@ exports[`TSGoLint E2E Snapshot Tests > should generate consistent diagnostics sn
       "id": "missingAwait",
     },
     "range": {
-      "end": 270,
-      "pos": 252,
+      "end": 264,
+      "pos": 261,
     },
     "rule": "require-await",
+    "suggestions": [
+      {
+        "fixes": [
+          {
+            "range": {
+              "end": 258,
+              "pos": 252,
+            },
+            "text": "",
+          },
+        ],
+        "message": {
+          "description": "Remove 'async'.",
+          "id": "removeAsync",
+        },
+      },
+    ],
   },
 ]
 `;

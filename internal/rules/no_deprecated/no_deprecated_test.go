@@ -496,9 +496,24 @@ exists('/foo');
 			/** @deprecated */
 			prop: string;
 		}
-		const obj: MyInterface = { prop: 'value' };
+		declare const obj: MyInterface;
 		const key = 'prop';
 		const { [key]: value } = obj;
+	`},
+		{Code: `
+		interface MyInterface {
+			/** @deprecated */
+			prop: string;
+		}
+		declare const obj: MyInterface;
+		declare const key: string;
+		const { [key]: value } = obj;
+	`},
+		{Code: `
+		declare const key: string;
+		const obj = {
+			[key]: 'value',
+		};
 	`},
 		{Code: `
 		export class Test {
@@ -507,7 +522,90 @@ exists('/foo');
 		return 42;
 	}
 }
-	`},
+		`},
+		{Code: `const DISALLOWED_CATEGORY_ITEM_REGEXP: RegExp = /regexp/;
+			const content = "";
+			const result = [...content.matchAll(DISALLOWED_CATEGORY_ITEM_REGEXP)].map(([, term, description, name, link]) => ({ link, }));`,
+		},
+		{Code: `
+export interface ErrorOptions {
+  /** @deprecated Use status instead. */
+  statusCode?: number;
+
+  status?: number;
+}
+
+const x: ErrorOptions = null!
+
+x.statusCode;
+      `, Options: rule_tester.OptionsFromJSON[NoDeprecatedOptions](`{"allow": ["statusCode"]}`)},
+		{Code: `
+        interface ErrorOptions {
+          /** @deprecated Use status instead. */
+          statusCode?: number;
+
+          status?: number;
+        }
+
+        declare function showError(error: ErrorOptions): void;
+        declare const statusCodeName: 'statusCode';
+
+        showError({
+          ['statusCode']: 500,
+        });
+
+        showError({
+          [statusCodeName]: 500,
+        });
+      `, Options: rule_tester.OptionsFromJSON[NoDeprecatedOptions](`{"allow": [{"from": "file", "name": "statusCode"}]}`)},
+		{Code: `
+        declare module 'error-options' {
+          export interface ErrorOptions {
+            /** @deprecated Use status instead. */
+            statusCode?: number;
+
+            status?: number;
+          }
+
+          export function showError(error: ErrorOptions): void;
+        }
+
+        import { showError } from 'error-options';
+
+        declare const statusCodeName: 'statusCode';
+
+        showError({
+          ['statusCode']: 500,
+        });
+
+        showError({
+          [statusCodeName]: 500,
+        });
+      `, Options: rule_tester.OptionsFromJSON[NoDeprecatedOptions](`{"allow": [{"from": "package", "name": "statusCode", "package": "error-options"}]}`)},
+		{Code: `
+        declare module 'error-options' {
+          export interface ErrorOptions {
+            /** @deprecated Use status instead. */
+            statusCode?: number;
+
+            status?: number;
+          }
+
+          export function showError(error: ErrorOptions): void;
+        }
+
+        import { showError } from 'error-options';
+
+        declare const statusCodeName: 'statusCode';
+
+        showError({
+          ['statusCode']: 500,
+        });
+
+        showError({
+          [statusCodeName]: 500,
+        });
+      `, Options: rule_tester.OptionsFromJSON[NoDeprecatedOptions](`{"allow": ["statusCode"]}`)},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Tsx: true,
@@ -2538,6 +2636,200 @@ exists('/foo');
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "deprecatedWithReason",
+				},
+			},
+		},
+		{
+			Code: `
+        interface ErrorOptions {
+          /** @deprecated Use code instead. */
+          "": number;
+
+          /** @deprecated Use status instead. */
+          statusCode?: number;
+
+          status?: number;
+        }
+
+        interface MethodOptions {
+          /** @deprecated Use status instead. */
+          statusCode(): number;
+        }
+
+        declare function showError(error: ErrorOptions): void;
+        declare function showMethodError(error: MethodOptions): void;
+        declare const emptyName: '';
+        declare const statusCode: number;
+        declare const statusCodeName: 'statusCode';
+
+        showError({
+          "": 500,
+        });
+
+        showError({
+          [""]: 500,
+        });
+
+        showError({
+          [emptyName]: 500,
+        });
+
+        showError({
+          statusCode: 500,
+        });
+
+        showError({
+          statusCode,
+        });
+
+        showError({
+          ['statusCode']: 500,
+        });
+
+        showError({
+          [statusCodeName]: 500,
+        });
+
+        showError({
+          get statusCode() {
+            return 500;
+          },
+        });
+
+        showError({
+          set statusCode(value: number) {},
+        });
+
+        showMethodError({
+          statusCode() {
+            return 500;
+          },
+        });
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      24,
+					Column:    11,
+					EndColumn: 13,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      28,
+					Column:    11,
+					EndColumn: 15,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      32,
+					Column:    11,
+					EndColumn: 22,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      36,
+					Column:    11,
+					EndColumn: 21,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      40,
+					Column:    11,
+					EndColumn: 21,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      44,
+					Column:    11,
+					EndColumn: 25,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      48,
+					Column:    11,
+					EndColumn: 27,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      52,
+					Column:    15,
+					EndColumn: 25,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      58,
+					Column:    15,
+					EndColumn: 25,
+				},
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      62,
+					Column:    11,
+					EndColumn: 21,
+				},
+			},
+		},
+		{
+			Code: `
+        interface ErrorOptions {
+          /** @deprecated Use status instead. */
+          statusCode?: number;
+
+          status?: number;
+        }
+
+        declare function showError(error: ErrorOptions): void;
+
+        showError({
+          statusCode: 500,
+        });
+      `,
+			Options: rule_tester.OptionsFromJSON[NoDeprecatedOptions](`{"allow": [{"from": "file", "name": "statusCode", "path": "other-file.ts"}]}`),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "deprecatedWithReason",
+					Line:      12,
+					Column:    11,
+					EndColumn: 21,
+				},
+			},
+		},
+		{
+			Code: `interface Something {
+  /**
+   * @deprecated
+   */
+  field: number;
+}
+function bar(_options: Something) {
+}
+bar({ field: 0 });`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "deprecated",
+					Line:      9,
+					Column:    7,
+					EndColumn: 12,
+				},
+			},
+		},
+		{
+			Tsx: true,
+			Code: `interface SomethingProps {
+  /**
+   * @deprecated
+   */
+  field: number;
+}
+function Foo(props: SomethingProps) {
+}
+const jsx = <Foo field={0} />;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "deprecated",
+					Line:      9,
+					Column:    18,
+					EndColumn: 23,
 				},
 			},
 		},

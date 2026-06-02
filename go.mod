@@ -8,6 +8,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
 	github.com/microsoft/typescript-go/shim/compiler => ./shim/compiler
 	github.com/microsoft/typescript-go/shim/core => ./shim/core
+	github.com/microsoft/typescript-go/shim/jsnum => ./shim/jsnum
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
 	github.com/microsoft/typescript-go/shim/parser => ./shim/parser
 	github.com/microsoft/typescript-go/shim/project => ./shim/project
@@ -25,6 +26,7 @@ require (
 	github.com/microsoft/typescript-go/shim/checker v0.0.0
 	github.com/microsoft/typescript-go/shim/compiler v0.0.0
 	github.com/microsoft/typescript-go/shim/core v0.0.0
+	github.com/microsoft/typescript-go/shim/jsnum v0.0.0
 	github.com/microsoft/typescript-go/shim/parser v0.0.0
 	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
@@ -33,22 +35,23 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
-	golang.org/x/sys v0.42.0
-	golang.org/x/tools v0.43.0
+	golang.org/x/sys v0.45.0
+	golang.org/x/tools v0.45.0
 	gotest.tools/v3 v3.5.2
 )
 
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
+	github.com/mackerelio/go-osstat v0.2.7 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20260528190657-0970dc40fa83 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/mod v0.33.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 )
 
 require (
-	github.com/dlclark/regexp2 v1.11.5
-	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
-	github.com/microsoft/typescript-go v0.0.0-20260309214900-4a59cd78390d // indirect
-	golang.org/x/text v0.35.0
+	github.com/dlclark/regexp2/v2 v2.1.1
+	github.com/go-json-experiment/json v0.0.0-20260520185125-572e7c383686
+	golang.org/x/text v0.37.0
 )

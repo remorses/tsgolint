@@ -654,6 +654,22 @@ console.log(x);
     expect(diagnostics).toHaveLength(0);
   });
 
+  it('should use ancestor tsconfig when nearest tsconfig excludes the file (voidzero-dev/vite-plus#1443)', async () => {
+    const testFile = resolveTestFilePath('issue-vp-1443/packages/cli/src/utils/terminal.ts');
+    const config = generateConfig([testFile], ['no-floating-promises'], {
+      reportSemantic: true,
+    });
+
+    const output = execFileSync(TSGOLINT_BIN, ['headless'], {
+      input: config,
+      env: { ...process.env, GOMAXPROCS: '1' },
+    });
+
+    const diagnostics = parseHeadlessOutput(output);
+
+    expect(diagnostics).toStrictEqual([]);
+  });
+
   it('should report type errors', async () => {
     const testFiles = await getTestFiles('report-type-errors');
     expect(testFiles.length).toBeGreaterThan(0);
@@ -713,6 +729,23 @@ console.log(x);
     const output = execFileSync(TSGOLINT_BIN, ['headless'], {
       input: config,
       env,
+    });
+
+    let diagnostics = parseHeadlessOutput(output);
+    diagnostics = sortDiagnostics(diagnostics);
+
+    expect(diagnostics).toMatchSnapshot();
+  });
+
+  it('should attach the tsconfig path to tsconfig-error diagnostics without a TypeScript diagnostic file (oxc-project/oxc#2200)', async () => {
+    const testFiles = await getTestFiles('issue-oxc-2200');
+    expect(testFiles.length).toBeGreaterThan(0);
+
+    const config = generateConfig(testFiles, ['no-floating-promises']);
+
+    const output = execFileSync(TSGOLINT_BIN, ['headless'], {
+      input: config,
+      env: { ...process.env, GOMAXPROCS: '1' },
     });
 
     let diagnostics = parseHeadlessOutput(output);

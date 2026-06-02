@@ -105,18 +105,18 @@ async function test() {
     `},
 		{Code: `
 async function test() {
-  Promise.resolve().catch(() => {}), 123;
-  123,
+  (Promise.resolve().catch(() => {}), 123);
+  (123,
     Promise.resolve().then(
       () => {},
       () => {},
-    );
-  123,
+    ));
+  (123,
     Promise.resolve().then(
       () => {},
       () => {},
     ),
-    123;
+    123);
 }
     `},
 		{Code: `
@@ -500,7 +500,7 @@ interface SafeThenable<T> {
   ): SafeThenable<TResult1 | TResult2>;
 }
 let promise: SafeThenable<number> = Promise.resolve(5);
-0, promise;
+(0, promise);
       `,
 			Options: rule_tester.OptionsFromJSON[NoFloatingPromisesOptions](`{"allowForKnownSafePromises": [{"from": "file", "name": "SafeThenable"}]}`),
 		},
@@ -570,7 +570,7 @@ interface SafeThenable<T> {
   ): SafeThenable<TResult1 | TResult2>;
 }
 let promise: () => SafeThenable<number> = () => Promise.resolve(5);
-0, promise();
+(0, promise());
       `,
 			Options: rule_tester.OptionsFromJSON[NoFloatingPromisesOptions](`{"allowForKnownSafePromises": [{"from": "file", "name": "SafeThenable"}]}`),
 		},
@@ -786,6 +786,61 @@ declare function createMyThenable(): MyThenable;
 
 createMyThenable();
     `},
+		{
+			Code: `
+const randomAsyncFunction = async () => {
+  return Promise.resolve(true);
+};
+
+randomAsyncFunction();
+      `,
+			Options: rule_tester.OptionsFromJSON[NoFloatingPromisesOptions](`{"allowForKnownSafeCalls": ["randomAsyncFunction"]}`),
+		},
+		{
+			Code: `
+async function myAsyncFunction() {
+  return Promise.resolve('test');
+}
+
+myAsyncFunction();
+      `,
+			Options: rule_tester.OptionsFromJSON[NoFloatingPromisesOptions](`{"allowForKnownSafeCalls": ["myAsyncFunction"]}`),
+		},
+		{
+			Skip: true,
+			Code: `
+      interface CustomNode<P> {
+        getNextNode: () => CustomNode<P>;
+      }
+
+      declare const createNode: () => {
+        getNextNode: <T>() => CustomNode<T>;
+      };
+
+      function wrapNode<T>(getNode: () => CustomNode<T>) {
+        return getNode;
+      }
+
+      (async () => {
+        wrapNode(() => {
+          const node = createNode();
+
+          return wrapNode<typeof node.getNextNode<any>>(node.getNextNode);
+        });
+      })().catch(() => {});
+    `,
+		},
+		{
+			Code: `
+interface SafePromise<T> extends Promise<T> {
+  __brand: string;
+}
+type BrandedSafePromise = SafePromise<number> & { foo: 'bar' };
+declare function getPromise(): BrandedSafePromise;
+getPromise();
+      `,
+			Options: rule_tester.OptionsFromJSON[NoFloatingPromisesOptions](`{"allowForKnownSafePromises": [{"from": "file", "name": "SafePromise"}]}`),
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
@@ -1917,9 +1972,9 @@ async function test() {
 		{
 			Code: `
 async function test() {
-  Promise.resolve(), 123;
-  123, Promise.resolve();
-  123, Promise.resolve(), 123;
+  (Promise.resolve(), 123);
+  (123, Promise.resolve());
+  (123, Promise.resolve(), 123);
 }
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1932,8 +1987,8 @@ async function test() {
 							Output: `
 async function test() {
   void (Promise.resolve(), 123);
-  123, Promise.resolve();
-  123, Promise.resolve(), 123;
+  (123, Promise.resolve());
+  (123, Promise.resolve(), 123);
 }
       `,
 						},
@@ -1942,8 +1997,8 @@ async function test() {
 							Output: `
 async function test() {
   await (Promise.resolve(), 123);
-  123, Promise.resolve();
-  123, Promise.resolve(), 123;
+  (123, Promise.resolve());
+  (123, Promise.resolve(), 123);
 }
       `,
 						},
@@ -1957,9 +2012,9 @@ async function test() {
 							MessageId: "floatingFixVoid",
 							Output: `
 async function test() {
-  Promise.resolve(), 123;
+  (Promise.resolve(), 123);
   void (123, Promise.resolve());
-  123, Promise.resolve(), 123;
+  (123, Promise.resolve(), 123);
 }
       `,
 						},
@@ -1967,9 +2022,9 @@ async function test() {
 							MessageId: "floatingFixAwait",
 							Output: `
 async function test() {
-  Promise.resolve(), 123;
+  (Promise.resolve(), 123);
   await (123, Promise.resolve());
-  123, Promise.resolve(), 123;
+  (123, Promise.resolve(), 123);
 }
       `,
 						},
@@ -1983,8 +2038,8 @@ async function test() {
 							MessageId: "floatingFixVoid",
 							Output: `
 async function test() {
-  Promise.resolve(), 123;
-  123, Promise.resolve();
+  (Promise.resolve(), 123);
+  (123, Promise.resolve());
   void (123, Promise.resolve(), 123);
 }
       `,
@@ -1993,8 +2048,8 @@ async function test() {
 							MessageId: "floatingFixAwait",
 							Output: `
 async function test() {
-  Promise.resolve(), 123;
-  123, Promise.resolve();
+  (Promise.resolve(), 123);
+  (123, Promise.resolve());
   await (123, Promise.resolve(), 123);
 }
       `,
@@ -2110,7 +2165,7 @@ await /* ... */ returnsPromise();
 async function returnsPromise() {
   return 'value';
 }
-1, returnsPromise();
+(1, returnsPromise());
       `,
 			Options: rule_tester.OptionsFromJSON[NoFloatingPromisesOptions](`{"ignoreVoid": false}`),
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -4432,7 +4487,7 @@ await promiseIntersection.finally(() => {});
 		},
 		{
 			Code: `
-Promise.resolve().finally(() => {}), 123;
+(Promise.resolve().finally(() => {}), 123);
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -5448,6 +5503,181 @@ void (<Promise<number>>{});
 							MessageId: "floatingFixAwait",
 							Output: `
 await (<Promise<number>>{});
+      `,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').then();
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "floatingVoid",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "floatingFixVoid",
+							Output: `
+void Promise.reject('foo').then();
+      `,
+						},
+						{
+							MessageId: "floatingFixAwait",
+							Output: `
+await Promise.reject('foo').then();
+      `,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').finally();
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "floatingVoid",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "floatingFixVoid",
+							Output: `
+void Promise.reject('foo').finally();
+      `,
+						},
+						{
+							MessageId: "floatingFixAwait",
+							Output: `
+await Promise.reject('foo').finally();
+      `,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').finally(...[], () => {});
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "floatingVoid",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "floatingFixVoid",
+							Output: `
+void Promise.reject('foo').finally(...[], () => {});
+      `,
+						},
+						{
+							MessageId: "floatingFixAwait",
+							Output: `
+await Promise.reject('foo').finally(...[], () => {});
+      `,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').then(...[], () => {});
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "floatingVoid",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "floatingFixVoid",
+							Output: `
+void Promise.reject('foo').then(...[], () => {});
+      `,
+						},
+						{
+							MessageId: "floatingFixAwait",
+							Output: `
+await Promise.reject('foo').then(...[], () => {});
+      `,
+						},
+					},
+				},
+			},
+		},
+		{
+			Skip: true,
+			Code: `
+        interface CustomNode<P> {
+          getNextNode: () => CustomNode<P>;
+        }
+
+        declare const createNode: () => {
+          getNextNode: <T>() => CustomNode<T>;
+        };
+
+        function wrapNode<T>(getNode: () => CustomNode<T>) {
+          return getNode;
+        }
+
+        (async () => {
+          wrapNode(() => {
+            const node = createNode();
+
+            return wrapNode<typeof node.getNextNode<any>>(node.getNextNode);
+          });
+        })();
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "floatingVoid",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "floatingFixVoid",
+							Output: `
+        interface CustomNode<P> {
+          getNextNode: () => CustomNode<P>;
+        }
+
+        declare const createNode: () => {
+          getNextNode: <T>() => CustomNode<T>;
+        };
+
+        function wrapNode<T>(getNode: () => CustomNode<T>) {
+          return getNode;
+        }
+
+        void (async () => {
+          wrapNode(() => {
+            const node = createNode();
+
+            return wrapNode<typeof node.getNextNode<any>>(node.getNextNode);
+          });
+        })();
+      `,
+						},
+						{
+							MessageId: "floatingFixAwait",
+							Output: `
+        interface CustomNode<P> {
+          getNextNode: () => CustomNode<P>;
+        }
+
+        declare const createNode: () => {
+          getNextNode: <T>() => CustomNode<T>;
+        };
+
+        function wrapNode<T>(getNode: () => CustomNode<T>) {
+          return getNode;
+        }
+
+        await (async () => {
+          wrapNode(() => {
+            const node = createNode();
+
+            return wrapNode<typeof node.getNextNode<any>>(node.getNextNode);
+          });
+        })();
       `,
 						},
 					},
