@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -102,7 +105,18 @@ func (h *compilerHost) GetSourceFile(opts ast.SourceFileParseOptions) *ast.Sourc
 		return cached
 	}
 
-	sourceFile := parser.ParseSourceFile(opts, text, scriptKind)
+	var sourceFile *ast.SourceFile
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				fmt.Fprintf(os.Stderr, "error parsing TypeScript source file: %s\nparser panic: %v\n", opts.FileName, recovered)
+			}
+		}()
+		sourceFile = parser.ParseSourceFile(opts, text, scriptKind)
+	}()
+	if sourceFile == nil {
+		return nil
+	}
 	result, _ := sourceFileCache.LoadOrStore(key, sourceFile)
 	return result
 }
